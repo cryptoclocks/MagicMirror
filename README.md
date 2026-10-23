@@ -3,6 +3,12 @@
 กระจก Python พร้อมผู้ช่วยเสียงภาษาไทยและอินเทอร์เฟซนีออนแบบ sci-fi
 เริ่มที่หน้า standby โดย **ยังไม่เปิดกล้องและไมค์**
 
+## ภาพกระจกใช้งานจริง
+
+| หน้ากระจกปกติ | หน้าสุขภาพ |
+|---|---|
+| ![AURA บนกระจกจริง — หน้าปกติ](docs/images/aura-mirror-home.png) | ![AURA บนกระจกจริง — หน้าสุขภาพพร้อม HUD](docs/images/aura-mirror-health.png) |
+
 ## ดาวน์โหลดจาก GitHub
 
 ```sh
@@ -11,7 +17,7 @@ cd MagicMirror
 /bin/zsh "./Start SmartMirror.command"
 ```
 
-ต้องมีสิทธิ์เข้าถึง repository และติดตั้ง Python 3 ก่อนใช้งาน
+ติดตั้ง Python 3 ก่อนใช้งาน
 API key ให้ตั้งในเครื่องตามหัวข้อเสียงด้านล่าง; ไม่รวมอยู่ใน repository
 
 ## เปิดใช้งาน (macOS)
