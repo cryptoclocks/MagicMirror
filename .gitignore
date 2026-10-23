@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+.secrets/
+.env
+
+.local/
+
+# Local credentials, runtime state and generated caches
+.env.*
+*.log
+*.download
+.pytest_cache/
+# Installer downloads and verifies this model on first run
+assets/models/lbfmodel.yaml
