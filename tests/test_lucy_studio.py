@@ -67,3 +67,12 @@ class LucyTests(unittest.TestCase):
         self.assertEqual(request.full_url,'https://api.decart.ai/v1/client/tokens')
         self.assertEqual(json.loads(request.data),{'expiresIn':120,'allowedModels':['lucy-2.5'],'allowedOrigins':['http://127.0.0.1:1234'],'constraints':{'realtime':{'maxSessionDuration':120}}})
         self.assertNotIn(b'permanent',request.data)
+
+    def test_tracking_models_and_wasm_are_local_assets(self):
+        with urllib.request.urlopen(self.server.url+'tracking/wasm/vision_wasm_internal.wasm') as response:
+            self.assertEqual(response.headers.get_content_type(),'application/wasm')
+            self.assertEqual(response.read(4),b'\x00asm')
+        for name in ('tracking/selfie_segmenter.tflite','tracking/face_landmarker.task','tracking/pose_landmarker_lite.task','tracking-worker.bundle.js'):
+            with urllib.request.urlopen(self.server.url+name) as response:
+                self.assertEqual(response.status,200)
+                self.assertTrue(response.read(16))

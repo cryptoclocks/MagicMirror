@@ -2,7 +2,15 @@
   "name": "magicmirror-lucy-studio",
   "private": true,
   "type": "module",
-  "scripts": {"build": "esbuild app.js --bundle --format=iife --platform=browser --target=chrome112 --minify --legal-comments=linked --outfile=studio.bundle.js"},
-  "dependencies": {"@decartai/sdk": "0.2.12"},
-  "devDependencies": {"esbuild": "0.25.12"}
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@decartai/sdk": "0.2.12",
+    "@mediapipe/tasks-vision": "0.10.32",
+    "three": "0.180.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  }
 }

@@ -2,6 +2,7 @@ import {createDecartClient, models} from '@decartai/sdk';
 import {StudioSession} from './session.js';
 import {LocalRenderer, localStyle} from './local-renderer.js';
 import {createGenerative} from './generative.js';
+import {TrackingMirror} from './tracking-mirror.js';
 const $ = id => document.getElementById(id);
 const prompts = {
   anime: 'Restyle the person and scene as a high-quality animated movie. Preserve pose, expression, composition and movement.',
@@ -11,7 +12,8 @@ const prompts = {
 };
 let run = 0, busy = false, active = false, previewStream = null, deadline = 0, watch = null, lastFrame = 0;
 let abort = null, frameCallback = null;
-let renderer = null, style = 'anime';
+let renderer = null, tracking = null, customBackground = null, style = 'anime';
+const isTracked = () => ['background','avatar'].includes($('provider').value);
 const isLocal = () => $('provider').value === 'local';
 const status = text => { $('status').textContent = text; };
 function controls() {
@@ -25,9 +27,13 @@ function controls() {
 function stop(message = 'หยุดแล้ว · ไม่ส่งภาพ') {
   run++; abort?.abort(); abort = null;
   clearInterval(watch); watch = null;
+  tracking?.dispose(); tracking = null;
   generative.stop();
   renderer?.dispose(); renderer = null;
-  $('local-output').hidden = true;
+  // A canvas cannot switch between an established 2D and WebGL context.
+  // Replace it after disposal so background/avatar/filter modes can alternate.
+  const oldCanvas=$('local-output'),newCanvas=oldCanvas.cloneNode(false);
+  newCanvas.width=newCanvas.height=1;newCanvas.hidden=true;oldCanvas.replaceWith(newCanvas);
   session.stop(); previewStream?.getTracks().forEach(t => t.stop()); previewStream = null;
   if (frameCallback !== null && $('output').cancelVideoFrameCallback) $('output').cancelVideoFrameCallback(frameCallback);
   frameCallback = null;
@@ -95,6 +101,7 @@ window.refreshConfig = async () => {
     const config = await (await fetch('config')).json();
     $('start').dataset.hasKey = config.hasKey ? 'yes' : '';
     $('start').dataset.aiReady = config.localAI ? 'yes' : '';
+    if (isTracked()) { $('hint').textContent = $('provider').value==='avatar' ? 'ติดตามหน้าและท่าทาง · อวาตาร์ 3D เต็มตัว · ภาพกล้องไม่แสดงเว้นแต่เปิดตัวอย่าง' : 'แยกคนจากฉากหลังในเครื่อง · เลือกฉากหรือรูปของคุณได้'; controls(); return; }
     if ($('provider').value==='generative') { $('hint').textContent = config.localAI ? 'Local AI พร้อม · ถ่ายภาพ ระบายพื้นที่ แล้วสร้างภาพ' : 'ต้องติดตั้งโมเดล Local AI ก่อน · ดู README'; controls(); return; }
     if (isLocal()) { $('hint').textContent = 'พร้อมใช้ในเครื่อง · เลือกสไตล์แล้วกดเริ่ม Local'; controls(); return; }
     $('hint').textContent = config.hasKey ? 'พร้อมใช้งาน · เลือกสไตล์แล้วกดเริ่ม AI' : 'กด “ตั้ง Decart API key” ด้านบนก่อนเริ่ม AI · ดูกล้องในเครื่องได้ทันที';
@@ -123,19 +130,49 @@ async function startLocal() {
     void cameras().catch(() => {});
   } catch(error) { if (thisRun === run) stop(/WebGL|Shader/.test(error?.message) ? 'เปิด GPU ไม่สำเร็จ ลองเปิดแอปใหม่' : errorText(error)); }
 }
+async function startTracking() {
+  stop();busy=true;controls();status('กำลังเปิดกล้องและตัวติดตามในเครื่อง…');const thisRun=run;
+  try {
+    const stream=await capture();if(thisRun!==run){stream.getTracks().forEach(t=>t.stop());return;}
+    previewStream=stream;$('input').srcObject=stream;await $('input').play();if(thisRun!==run)return;
+    $('input').style.display=$('live-preview').checked?'block':'none';
+    tracking=new TrackingMirror({video:$('input'),canvas:$('local-output'),mode:$('provider').value,
+      onMetrics:metrics=>{if(thisRun===run){$('timer').textContent=`แสดง ${metrics.renderFps} FPS · ติดตาม ${metrics.trackingFps} FPS`;
+        if($('provider').value==='avatar')status(metrics.face?'AVATAR LIVE · ในเครื่อง':'AVATAR · หันหน้าเข้ากล้องเพื่อขยับสีหน้า');}},
+      onError:()=>{if(thisRun===run)stop('ตัวติดตามไม่พร้อม กรุณาหยุดแล้วลองใหม่');}});
+    tracking.setBackground($('live-background').value,customBackground);
+    tracking.avatar?.setHat($('avatar-hat').value);tracking.avatar?.setOutfit($('avatar-outfit').value);tracking.avatar?.setCharacter($('avatar-character').value);
+    await tracking.start();if(thisRun!==run)return;
+    $('local-output').hidden=false;$('empty').style.display='none';busy=false;active=true;controls();status('LIVE · ประมวลผลในเครื่อง');
+    void cameras().catch(()=>{});
+  } catch(error) {if(thisRun===run)stop(errorText(error));}
+}
+$('live-background').onchange=()=>{tracking?.setBackground($('live-background').value,customBackground);};
+$('avatar-hat').onchange=()=>tracking?.avatar?.setHat($('avatar-hat').value);
+$('avatar-outfit').onchange=()=>tracking?.avatar?.setOutfit($('avatar-outfit').value);
+$('avatar-character').onchange=()=>tracking?.avatar?.setCharacter($('avatar-character').value);
+$('live-preview').onchange=()=>{$('input').style.display=active&&$('live-preview').checked?'block':'none';};
+$('live-upload').onchange=async()=>{
+  const file=$('live-upload').files[0];if(!file)return;
+  if(file.size>15*1024*1024)return status('เลือกรูปไม่เกิน 15 MB');
+  try{const image=await createImageBitmap(file);customBackground?.close?.();customBackground=image;$('live-background').value='custom';tracking?.setBackground('custom',image);}catch{status('เปิดรูปพื้นหลังไม่ได้');}
+};
 $('provider').onchange = () => {
   stop();
   const generating = $('provider').value==='generative';
-  $('presets').hidden = generating; $('prompt-form').hidden = generating;
+  $('presets').hidden = generating || isTracked(); $('prompt-form').hidden = generating || isTracked();
+  $('live-controls').hidden = !isTracked();$('avatar-options').hidden = $('provider').value!=='avatar';
   $('mode-info').textContent = generating ? 'Local inpainting · Apple Metal' : '';
-  $('start').textContent = generating ? 'เปิดกล้อง Local AI' : isLocal() ? 'เริ่ม Local' : 'เริ่ม AI · ส่งภาพไป Decart';
-  if (!generating) $('mode-info').textContent = isLocal() ? 'เอฟเฟกต์ GPU · ไม่ใช้ API key' : 'Generative AI · ใช้ Decart API key';
-  $('privacy').textContent = generating ? 'สร้างภาพจริงในเครื่อง · ภาพมีระยะหน่วง · ระบายพื้นที่ก่อนสร้าง · ไม่ใช้ API key' : isLocal() ? 'ภาพอยู่ในเครื่อง · ไม่ใช้เครดิต · ไม่ส่งไมโครโฟน' : 'ส่งวิดีโอไป Decart · ใช้เครดิต · หยุดอัตโนมัติใน 2 นาที';
+  $('start').textContent = isTracked() ? 'เริ่มกล้อง · Offline' : generating ? 'เปิดกล้อง Local AI' : isLocal() ? 'เริ่ม Local' : 'เริ่ม AI · ส่งภาพไป Decart';
+  if (isTracked()) $('mode-info').textContent='โมเดลติดตามขนาดเล็ก · ไม่ใช้ API key';
+  else if (!generating) $('mode-info').textContent = isLocal() ? 'เอฟเฟกต์ GPU · ไม่ใช้ API key' : 'Generative AI · ใช้ Decart API key';
+  $('privacy').textContent = isTracked() ? 'ภาพประมวลผลในเครื่อง · ไม่ส่งภาพออก · ไม่ใช้โมเดลสร้างภาพหนัก' : generating ? 'สร้างภาพจริงในเครื่อง · ภาพมีระยะหน่วง · ระบายพื้นที่ก่อนสร้าง · ไม่ใช้ API key' : isLocal() ? 'ภาพอยู่ในเครื่อง · ไม่ใช้เครดิต · ไม่ส่งไมโครโฟน' : 'ส่งวิดีโอไป Decart · ใช้เครดิต · หยุดอัตโนมัติใน 2 นาที';
   $('prompt').placeholder = isLocal() ? 'ชื่อสไตล์: อนิเมะ นีออน สีน้ำ โฮโลแกรม' : 'อธิบายเสื้อผ้า ฉาก หรือสไตล์ที่ต้องการ';
   $('prompt').value = isLocal() ? document.querySelector('[data-style].active').textContent : prompts[style];
   void window.refreshConfig();
 };
 $('start').onclick = async () => {
+  if (isTracked()) return startTracking();
   if ($('provider').value==='generative') { stop();busy=true;controls();try {await generative.start();} catch(error) {stop(errorText(error));} return; }
   if (isLocal()) return startLocal();
   if (!$('prompt').value.trim()) return status('เลือกสไตล์หรือพิมพ์เอฟเฟกต์ก่อน');

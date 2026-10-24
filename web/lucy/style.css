@@ -4,3 +4,5 @@
 
 #ai-photo,#ai-mask{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}#ai-mask{cursor:crosshair;touch-action:none}#ai-photo[hidden],#ai-mask[hidden],#ai-controls[hidden]{display:none}#ai-controls input[type=range]{width:90px;padding:0;min-width:0}#ai-controls input[type=checkbox]{min-width:0}#ai-controls label{font-size:12px}#ai-prompt{min-width:200px;flex:1}
 [hidden]{display:none!important}#ai-mask{z-index:2}#input{z-index:3}.pill,#timer{z-index:4}
+
+.upload-label{font-size:12px}#live-upload{min-width:0;width:230px;padding:7px}#live-controls label{font-size:12px;display:inline-flex;align-items:center;gap:8px}#live-controls input[type=checkbox]{min-width:0}#avatar-options[hidden]{display:none}

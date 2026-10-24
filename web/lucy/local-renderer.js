@@ -100,5 +100,6 @@ export class LocalRenderer {
   dispose(){
     this.stop();this.canvas.removeEventListener('webglcontextlost',this.onContextLost);
     this.gl.deleteTexture(this.texture);this.gl.deleteBuffer(this.buffer);this.gl.deleteProgram(this.program);
+    this.gl.getExtension('WEBGL_lose_context')?.loseContext();
   }
 }

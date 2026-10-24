@@ -86,8 +86,13 @@ class StudioServer:
                     return self.respond(200,json.dumps(owner.ai.snapshot(name.split('/')[-1])).encode())
                 files = {'': ('index.html', 'text/html; charset=utf-8'),
                          'studio.bundle.js': ('studio.bundle.js', 'text/javascript'),
+                         'tracking-worker.bundle.js': ('tracking-worker.bundle.js', 'text/javascript'),
                          'studio.bundle.js.LEGAL.txt': ('studio.bundle.js.LEGAL.txt', 'text/plain'),
                          'style.css': ('style.css', 'text/css')}
+                for asset in ('selfie_segmenter.tflite','face_landmarker.task','pose_landmarker_lite.task'):
+                    files['tracking/'+asset]=('tracking/'+asset,'application/octet-stream')
+                for asset in ('vision_wasm_internal.js','vision_wasm_nosimd_internal.js','vision_wasm_internal.wasm','vision_wasm_nosimd_internal.wasm'):
+                    files['tracking/wasm/'+asset]=('tracking/wasm/'+asset,'application/wasm' if asset.endswith('.wasm') else 'text/javascript')
                 if name not in files:
                     return self.respond(404, b'{}')
                 file, mime = files[name]
