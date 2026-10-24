@@ -1,6 +1,7 @@
 import {createDecartClient, models} from '@decartai/sdk';
 import {StudioSession} from './session.js';
 import {LocalRenderer, localStyle} from './local-renderer.js';
+import {createGenerative} from './generative.js';
 const $ = id => document.getElementById(id);
 const prompts = {
   anime: 'Restyle the person and scene as a high-quality animated movie. Preserve pose, expression, composition and movement.',
@@ -14,7 +15,7 @@ let renderer = null, style = 'anime';
 const isLocal = () => $('provider').value === 'local';
 const status = text => { $('status').textContent = text; };
 function controls() {
-  $('start').disabled = busy || active || (!isLocal() && !$('start').dataset.hasKey);
+  $('start').disabled = busy || active || ($('provider').value==='cloud' && !$('start').dataset.hasKey) || ($('provider').value==='generative' && !$('start').dataset.aiReady);
   $('provider').disabled = busy || active || !!previewStream;
   $('preview').disabled = busy || active;
   $('stop').disabled = !busy && !active && !previewStream;
@@ -24,6 +25,7 @@ function controls() {
 function stop(message = 'หยุดแล้ว · ไม่ส่งภาพ') {
   run++; abort?.abort(); abort = null;
   clearInterval(watch); watch = null;
+  generative.stop();
   renderer?.dispose(); renderer = null;
   $('local-output').hidden = true;
   session.stop(); previewStream?.getTracks().forEach(t => t.stop()); previewStream = null;
@@ -87,10 +89,13 @@ const session = new StudioSession({
     return realtime;
   }
 });
+const generative = createGenerative({capture,status,changed:value=>{busy=false;active=value;controls();}});
 window.refreshConfig = async () => {
   try {
     const config = await (await fetch('config')).json();
     $('start').dataset.hasKey = config.hasKey ? 'yes' : '';
+    $('start').dataset.aiReady = config.localAI ? 'yes' : '';
+    if ($('provider').value==='generative') { $('hint').textContent = config.localAI ? 'Local AI พร้อม · ถ่ายภาพ ระบายพื้นที่ แล้วสร้างภาพ' : 'ต้องติดตั้งโมเดล Local AI ก่อน · ดู README'; controls(); return; }
     if (isLocal()) { $('hint').textContent = 'พร้อมใช้ในเครื่อง · เลือกสไตล์แล้วกดเริ่ม Local'; controls(); return; }
     $('hint').textContent = config.hasKey ? 'พร้อมใช้งาน · เลือกสไตล์แล้วกดเริ่ม AI' : 'กด “ตั้ง Decart API key” ด้านบนก่อนเริ่ม AI · ดูกล้องในเครื่องได้ทันที';
     controls();
@@ -120,14 +125,18 @@ async function startLocal() {
 }
 $('provider').onchange = () => {
   stop();
-  $('start').textContent = isLocal() ? 'เริ่ม Local' : 'เริ่ม AI · ส่งภาพไป Decart';
-  $('mode-info').textContent = isLocal() ? 'เอฟเฟกต์ GPU · ไม่ใช้ API key' : 'Generative AI · ใช้ Decart API key';
-  $('privacy').textContent = isLocal() ? 'ภาพอยู่ในเครื่อง · ไม่ใช้เครดิต · ไม่ส่งไมโครโฟน' : 'ส่งวิดีโอไป Decart · ใช้เครดิต · หยุดอัตโนมัติใน 2 นาที';
+  const generating = $('provider').value==='generative';
+  $('presets').hidden = generating; $('prompt-form').hidden = generating;
+  $('mode-info').textContent = generating ? 'Local inpainting · Apple Metal' : '';
+  $('start').textContent = generating ? 'เปิดกล้อง Local AI' : isLocal() ? 'เริ่ม Local' : 'เริ่ม AI · ส่งภาพไป Decart';
+  if (!generating) $('mode-info').textContent = isLocal() ? 'เอฟเฟกต์ GPU · ไม่ใช้ API key' : 'Generative AI · ใช้ Decart API key';
+  $('privacy').textContent = generating ? 'สร้างภาพจริงในเครื่อง · ภาพมีระยะหน่วง · ระบายพื้นที่ก่อนสร้าง · ไม่ใช้ API key' : isLocal() ? 'ภาพอยู่ในเครื่อง · ไม่ใช้เครดิต · ไม่ส่งไมโครโฟน' : 'ส่งวิดีโอไป Decart · ใช้เครดิต · หยุดอัตโนมัติใน 2 นาที';
   $('prompt').placeholder = isLocal() ? 'ชื่อสไตล์: อนิเมะ นีออน สีน้ำ โฮโลแกรม' : 'อธิบายเสื้อผ้า ฉาก หรือสไตล์ที่ต้องการ';
   $('prompt').value = isLocal() ? document.querySelector('[data-style].active').textContent : prompts[style];
   void window.refreshConfig();
 };
 $('start').onclick = async () => {
+  if ($('provider').value==='generative') { stop();busy=true;controls();try {await generative.start();} catch(error) {stop(errorText(error));} return; }
   if (isLocal()) return startLocal();
   if (!$('prompt').value.trim()) return status('เลือกสไตล์หรือพิมพ์เอฟเฟกต์ก่อน');
   stop(); busy = true; controls(); status('กำลังเปิดกล้องและเชื่อมต่อ…');

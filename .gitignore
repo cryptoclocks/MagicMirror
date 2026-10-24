@@ -17,3 +17,6 @@ __pycache__/
 assets/models/lbfmodel.yaml
 
 node_modules/
+
+.venv-ai/
+.local-ai/

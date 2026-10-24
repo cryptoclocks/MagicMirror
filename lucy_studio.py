@@ -51,6 +51,10 @@ def mint_token(key, origin):
 class StudioServer:
     """Loopback-only, unguessable URL, exact assets, same-origin token endpoint."""
     def __init__(self):
+        from local_ai import LocalAI
+        from motion_buffer import MotionBuffer
+        self.ai = LocalAI()
+        self.motion = MotionBuffer()
         self.prefix = '/' + secrets.token_urlsafe(24) + '/'
         owner = self
         class Handler(BaseHTTPRequestHandler):
@@ -77,7 +81,9 @@ class StudioServer:
                     return self.respond(404, b'{}')
                 name = self.path[len(owner.prefix):]
                 if name == 'config':
-                    return self.respond(200, json.dumps({'hasKey': bool(api_key())}).encode())
+                    return self.respond(200, json.dumps({'hasKey': bool(api_key()),'localAI':owner.ai.available()}).encode())
+                if name.startswith('ai/status/'):
+                    return self.respond(200,json.dumps(owner.ai.snapshot(name.split('/')[-1])).encode())
                 files = {'': ('index.html', 'text/html; charset=utf-8'),
                          'studio.bundle.js': ('studio.bundle.js', 'text/javascript'),
                          'studio.bundle.js.LEGAL.txt': ('studio.bundle.js.LEGAL.txt', 'text/plain'),
@@ -91,9 +97,37 @@ class StudioServer:
                     self.respond(404, b'{}')
 
             def do_POST(self):
-                if (not self.valid_host() or self.path != owner.prefix + 'token'
+                route=self.path[len(owner.prefix):] if self.path.startswith(owner.prefix) else ''
+                if (not self.valid_host() or route not in ('token','ai/start','ai/cancel','ai/face','ai/motion/begin','ai/motion/step')
                         or self.headers.get('Origin') != owner.origin):
                     return self.respond(403, b'{}')
+                if route=='ai/cancel':
+                    owner.ai.close()
+                    owner.motion.reset()
+                    return self.respond(200,b'{}')
+                if route in ('ai/start','ai/face','ai/motion/begin','ai/motion/step'):
+                    try:
+                        length=int(self.headers.get('Content-Length','0'))
+                        if not 0<length<4*1024*1024:raise ValueError('ขนาดคำขอไม่ถูกต้อง')
+                        data=json.loads(self.rfile.read(length))
+                        if not isinstance(data,dict):raise ValueError('คำขอไม่ถูกต้อง')
+                        if route=='ai/motion/begin':
+                            owner.motion.begin(data)
+                            return self.respond(200,b'{}')
+                        if route=='ai/motion/step':
+                            return self.respond(200,json.dumps({'image':owner.motion.step(data)}).encode())
+                        if route=='ai/face':
+                            import base64,cv2,numpy as np
+                            frame=cv2.imdecode(np.frombuffer(base64.b64decode(data.get('image',''),validate=True),np.uint8),cv2.IMREAD_COLOR)
+                            if frame is None or frame.shape[:2]!=(512,512):raise ValueError('ภาพต้องมีขนาด 512x512')
+                            detector=cv2.CascadeClassifier(cv2.data.haarcascades+'haarcascade_frontalface_alt2.xml')
+                            faces=detector.detectMultiScale(cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY),1.1,5)
+                            face=[int(v) for v in max(faces,key=lambda b:b[2]*b[3])] if len(faces) else None
+                            return self.respond(200,json.dumps({'face':face}).encode())
+                        job=owner.ai.start(data)
+                        return self.respond(200,json.dumps({'id':job}).encode())
+                    except (ValueError,RuntimeError,KeyError,TypeError) as exc:
+                        return self.respond(400,json.dumps({'error':str(exc)}).encode())
                 key = api_key()
                 if not key:
                     return self.respond(409, json.dumps({'error':'กรุณาตั้ง Decart API key จากปุ่มด้านบน'}).encode())
@@ -116,6 +150,7 @@ class StudioServer:
         self.thread.start()
 
     def close(self):
+        self.ai.close()
         self.server.shutdown()
         self.server.server_close()
         self.thread.join(timeout=1)

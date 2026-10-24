@@ -99,3 +99,29 @@ cloud session, or capture audio. It processes camera video locally at up to
 is displayed. A synthetic 640×360 video smoke test in the embedded WebEngine
 reported about 30 FPS, zero token requests, and an ended camera track after
 Stop. This does not measure camera latency or generative-model performance.
+
+## Local generative follow-up
+
+Added an actual local inpainting backend after the user accepted delayed output.
+This is a separate model from Lucy: SD 1.5 Inpainting (pinned revision
+`8a4288a76071f7280aedbdb3253bdb9e9d5d84bb`) plus LCM-LoRA SD 1.5
+(`cf2fced511dbe7e26c8d1d397e728fbab875db4b`). Uses safetensors only, MPS FP16
+UNet with upcast attention, FP32 VAE decode, CPU-seeded noise and offline-only
+runtime loading. The final composited output is checked by the model's safety
+checker. Pixels outside the user's mask are preserved exactly in the still result.
+
+Actual test on this M1 Pro / 16 GB host generated a cap edit on the user's
+provided fully clothed mirror photo: 512×512, four LCM steps, 14.05 seconds
+inference and 36.46 seconds including cold model loading. The intermediate
+comparison is a temporary review artifact and is not published. This result is
+one test, not a sustained generation or camera latency benchmark.
+
+Continuous mode captures bounded source clips while inference runs and uses
+OpenCV backward optical flow to propagate each generated keyframe through the
+delayed source frames. It keeps a cumulative coordinate map rather than
+repeatedly resampling generated pixels. Target playback is 8 FPS; the bounded
+queue can drop a waiting clip to prevent indefinite delay growth. This technique
+can visibly warp or drift and is not equivalent to a temporally trained video
+model. A synthetic browser test exercises repeated inference completion, buffered
+playback requests, cancellation and zero external requests; that test mocks the
+inference response, while real model inference was tested separately above.

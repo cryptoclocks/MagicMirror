@@ -9,10 +9,11 @@
 |---|---|
 | ![AURA บนกระจกจริง — หน้าปกติ](docs/images/aura-mirror-home.png) | ![AURA บนกระจกจริง — หน้าสุขภาพพร้อม HUD](docs/images/aura-mirror-health.png) |
 
-## AI Studio / Local GPU และ Lucy 2.5
+## AI Studio / Local AI, Local GPU และ Lucy 2.5
 
 หลังเข้าหน้าหลัก กดปุ่ม **AI Studio**, กด **L**, หรือพูด **เปิดลูซี่** / **เปิดเอไอสตูดิโอ**
-เริ่มต้นเป็น **Local GPU**: เลือกอนิเมะ ไซเบอร์พังก์ โฮโลแกรม หรือสีน้ำ แล้วกด **เริ่ม Local**
+เริ่มต้นเป็น **Local AI · Metal** สำหรับสร้างภาพใหม่จริง ดูวิธีใช้และติดตั้งท้าย README
+หากต้องการฟิลเตอร์สดแบบเบา ให้เลือก **Local GPU** แล้วเลือกอนิเมะ ไซเบอร์พังก์ โฮโลแกรม หรือสีน้ำ และกด **เริ่ม Local**
 ทำเอฟเฟกต์จากกล้องในเครื่อง ไม่ส่งภาพออก ไม่ใช้ API key ไม่ใช้เครดิต และสลับสไตล์ได้ทันที
 ช่องข้อความ Local จับชื่อสไตล์ทั้งไทยและอังกฤษ ไม่ใช่ generative model ที่สร้างเสื้อผ้าหรือฉากใหม่
 แสดง FPS ของภาพที่ประมวลผลจริง และคืนกล้องเมื่อกดหยุดหรือกลับหน้าหลัก
@@ -253,3 +254,36 @@ PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m unittest discover -s tests
 ไม่มีไฟล์อัดเสียงผู้ใช้ ไฟล์ render ชั่วคราว หรือการดาวน์โหลด EffectCraft
 
 Automatic camera retouch uses OpenCV landmarks for subtle cheek slimming, eyebrow darkening and skin brightening/smoothing, without an on-screen indicator. Eyes and lips retain detail. Overlay landmarks follow the adjusted face; detection uses original camera pixels. Tracking uses robust optical flow and refits the moving face ROI across brief detector misses. Lost tracking fades out within 160 ms; held points are never sent to HUD/hat overlays. Camera changes clear retouch state. Unmatched commands are silent.
+
+## Local AI บน M1 Pro 16 GB — สร้างหมวก/ชุด/หน้า/ฉากใหม่
+
+โหมด **Local AI · Metal** เป็นค่าเริ่มต้นใหม่ของ Studio ใช้ Stable Diffusion 1.5
+Inpainting + LCM-LoRA สร้างรายละเอียดใหม่จริงในพื้นที่ที่เลือก แยกจาก Local GPU ซึ่งเป็นฟิลเตอร์ภาพ
+ไม่ต้องใช้ Decart API key และไม่ส่งภาพหรือ prompt ออกไปขณะสร้าง
+
+เครื่องนี้ติดตั้งแล้ว หากติดตั้งบนเครื่องใหม่ ให้เปิด `Install Local AI.command`
+ตัวติดตั้งใช้ `.venv-ai` แยกจากโปรแกรมหลัก และดาวน์โหลดโมเดล/adapter ที่ตรึงรุ่นไว้ประมาณ 3 GB
+เก็บใน `.local-ai/` ซึ่งไม่ขึ้น GitHub ดาวน์โหลดครั้งแรกใช้อินเทอร์เน็ต หลังจากนั้น worker บังคับใช้ไฟล์ในเครื่อง
+แหล่งโมเดลและเงื่อนไขการใช้งาน: [SD 1.5 Inpainting](https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-inpainting)
+และ [LCM-LoRA SD 1.5](https://huggingface.co/latent-consistency/lcm-lora-sdv1-5)
+
+วิธีใช้:
+
+1. เข้าหน้าหลัก กด L แล้วเลือก **Local AI · Metal** และ **เปิดกล้อง Local AI**
+2. เลือก **หมวก / เสื้อผ้า / ใบหน้า / ฉากหลัง** พื้นที่สีเขียวเป็นเพียงข้อเสนอจากตำแหน่งใบหน้า
+3. ระบายหรือลบพื้นที่บนภาพให้ตรงกับส่วนที่ต้องการเปลี่ยน โดยเฉพาะเมื่อไม่พบหน้า
+4. ใช้ prompt ภาษาอังกฤษที่เตรียมไว้หรือแก้เอง แล้วกด **สร้างภาพ**
+5. เลือก **สร้างต่อเนื่อง + ภาพหน่วง** ก่อนสร้าง เพื่อใช้บัฟเฟอร์ภาพและการชดเชยการเคลื่อนไหว
+6. กด **หยุด** หรือกลับหน้าหลักเพื่อยกเลิกงาน ปิดกล้อง และคืนแรมของโมเดล
+
+ผลวัดจริงบน M1 Pro 16 GB: 512×512, LCM 4 ขั้น ใช้ **14.05 วินาทีสำหรับสร้างภาพ**
+รอบแรกที่รวมโหลดโมเดลใช้ประมาณ **36.46 วินาที** ผลขึ้นอยู่กับแรมที่เหลือและแอปอื่น
+ตรวจภาพเพิ่มหมวกแล้ว และตรวจว่าพิกเซลนอกพื้นที่ที่เลือกยังตรงกับต้นฉบับ
+
+ภาพต่อเนื่องเป็น **AI keyframes + optical flow** ไม่ใช่โมเดลสร้างวิดีโอทุกเฟรมแบบ Lucy
+ระบบเก็บไม่เกิน 128 เฟรมต่อชุด เล่นการเคลื่อนไหวเป้าหมาย 8 FPS และเก็บชุดรอเล่นไม่เกินหนึ่งชุด
+ความหน่วงเริ่มจากเวลาสร้างภาพ ส่วนการเปลี่ยนภาพนิ่งใช้ crossfade 650 ms
+อาจเห็นภาพบิดเมื่อเคลื่อนเร็ว หันมาก หรือมีสิ่งบัง และรายละเอียดอาจเปลี่ยนระหว่าง keyframe
+ภาพส่วนที่ไม่ได้เลือกจะใช้ภาพกล้องเดิม แต่การรักษาใบหน้าในพื้นที่ที่สั่งเปลี่ยนยังไม่รับประกัน
+
+`preview-local-ai.png` เป็นภาพทดสอบ UI ด้วยวิดีโอสังเคราะห์และผลโมเดลจำลอง ไม่ใช่ตัวอย่างคุณภาพภาพที่ AI สร้าง
