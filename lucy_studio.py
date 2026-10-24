@@ -89,6 +89,8 @@ class StudioServer:
                          'tracking-worker.bundle.js': ('tracking-worker.bundle.js', 'text/javascript'),
                          'studio.bundle.js.LEGAL.txt': ('studio.bundle.js.LEGAL.txt', 'text/plain'),
                          'style.css': ('style.css', 'text/css')}
+                for asset in ('cat.glb','dog.glb','bunny.glb','fox.glb','panda.glb','Textures/colormap.png'):
+                    files['animals/'+asset]=('animals/'+asset,'image/png' if asset.endswith('.png') else 'model/gltf-binary')
                 for asset in ('selfie_segmenter.tflite','face_landmarker.task','pose_landmarker_lite.task'):
                     files['tracking/'+asset]=('tracking/'+asset,'application/octet-stream')
                 for asset in ('vision_wasm_internal.js','vision_wasm_nosimd_internal.js','vision_wasm_internal.wasm','vision_wasm_nosimd_internal.wasm'):
@@ -163,7 +165,8 @@ class StudioServer:
 
 def create_studio(parent, on_back):
     # Optional imports: a missing WebEngine must not prevent ordinary mirror startup.
-    from PySide6.QtCore import QUrl, Qt
+    from PySide6.QtCore import QUrl, Qt, QObject, Slot
+    from PySide6.QtWebChannel import QWebChannel
     from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QInputDialog, QLineEdit, QApplication
     from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile
     from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -175,14 +178,22 @@ def create_studio(parent, on_back):
         def javaScriptConsoleMessage(self, *_):
             pass  # SDK diagnostic messages can include connection identifiers.
 
+    class MenuBridge(QObject):
+        @Slot(bool)
+        def setMenuHidden(self, hidden):
+            self.parent().toggle_menu(hidden)
+
     class Studio(QWidget):
         def __init__(self):
             super().__init__(parent)
             self.server = StudioServer()
             self.closed = False
+            self.menu_hidden = False
             layout = QVBoxLayout(self)
+            self.main_layout = layout
             layout.setContentsMargins(14, 8, 14, 4)
-            bar = QHBoxLayout()
+            self.toolbar = QWidget(self)
+            bar = QHBoxLayout(self.toolbar)
             bar.addWidget(QLabel('AURA · STYLE STUDIO / LOCAL + LUCY'))
             bar.addStretch()
             key = QPushButton('ตั้ง API key · เฉพาะ Cloud')
@@ -190,17 +201,33 @@ def create_studio(parent, on_back):
             back = QPushButton('กลับหน้าหลัก')
             back.clicked.connect(on_back)
             bar.addWidget(key); bar.addWidget(back)
-            layout.addLayout(bar)
+            layout.addWidget(self.toolbar)
             self.view = QWebEngineView(self)
             self.profile = QWebEngineProfile(QApplication.instance())
             self.page = LocalPage(self.profile, self.view)
             self.page.destroyed.connect(self.profile.deleteLater)
             self.page.studio_url = self.server.url
+            self.channel = QWebChannel(self.page)
+            self.menu_bridge = MenuBridge(self)
+            self.channel.registerObject('auraMenu', self.menu_bridge)
+            self.page.setWebChannel(self.channel)
             self.page.featurePermissionRequested.connect(self.permission)
             self.view.setPage(self.page)
             self.view.setUrl(QUrl(self.server.url))
             layout.addWidget(self.view)
             self.setStyleSheet('QLabel {color:#77fff1;} QWidget {background:#050e15;}')
+
+        def toggle_menu(self, hidden):
+            self.menu_hidden = hidden
+            self.toolbar.setVisible(not hidden)
+            self.main_layout.setContentsMargins(*( (0,0,0,0) if hidden else (14,8,14,4) ))
+            self.main_layout.setSpacing(0 if hidden else 6)
+            for name in ('mic_button','camera_button','input','send_button'):
+                widget = getattr(parent, name, None)
+                if widget is not None:
+                    widget.setVisible(not hidden)
+            parent.layout_controls()
+            parent.update()
 
         def permission(self, origin, feature):
             allowed = (origin.toString().rstrip('/') == self.server.origin and

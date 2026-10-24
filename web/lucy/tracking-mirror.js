@@ -5,7 +5,7 @@ export class TrackingMirror {
     Object.assign(this,{video,canvas,mode,onStatus,onMetrics,onError,disposed:false,ready:false,pending:false,lastFrame:-1,lastSubmit:0,maskStamp:0,scene:'studio',custom:null,previousMask:null});
     this.context=canvas.getContext('2d');this.mask=document.createElement('canvas');this.maskContext=this.mask.getContext('2d');
     this.person=document.createElement('canvas');this.personContext=this.person.getContext('2d');this.backdrop=document.createElement('canvas');this.backgroundDirty=true;
-    if(mode==='avatar')this.avatar=new CartoonAvatar();
+    if(mode==='avatar')this.avatar=new CartoonAvatar(video);
   }
   async start(){
     this.worker=new Worker(new URL('tracking-worker.bundle.js',location.href));

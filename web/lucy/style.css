@@ -6,3 +6,5 @@
 [hidden]{display:none!important}#ai-mask{z-index:2}#input{z-index:3}.pill,#timer{z-index:4}
 
 .upload-label{font-size:12px}#live-upload{min-width:0;width:230px;padding:7px}#live-controls label{font-size:12px;display:inline-flex;align-items:center;gap:8px}#live-controls input[type=checkbox]{min-width:0}#avatar-options[hidden]{display:none}
+
+#menu-toggle{position:fixed;right:22px;top:58px;z-index:10;background:#07141dcc;font-size:11px;padding:7px 12px}.immersive main{padding:0;max-width:none}.immersive .stage{height:100vh;border:0;border-radius:0}.immersive .controls,.immersive .pill,.immersive #timer{display:none}.immersive #menu-toggle{top:14px;opacity:.65}.immersive #menu-toggle:hover{opacity:1}

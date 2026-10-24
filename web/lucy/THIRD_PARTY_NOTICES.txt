@@ -1204,3 +1204,9 @@ For files under tasks/cc/text/language_detector/custom_ops/utils/utf/
  * REPRESENTATION OR WARRANTY OF ANY KIND CONCERNING THE MERCHANTABILITY
  * OF THIS SOFTWARE OR ITS FITNESS FOR ANY PARTICULAR PURPOSE.
  */
+
+Kenney Cube Pets (five mascot heads: cat, dog, bunny, fox, panda)
+Creator: Kenney — https://kenney.nl/assets/cube-pets
+License: Creative Commons CC0 1.0
+Original GLB files and colormap, adapted at runtime by hiding legs/tails and normalizing scale.
+See animals/LICENSE.txt and animals/SOURCE.json for source and file hashes.

@@ -1,0 +1,12 @@
+{
+  "creator": "Kenney",
+  "source": "https://kenney.nl/assets/cube-pets",
+  "license": "CC0-1.0",
+  "files": {
+    "cat.glb": "1e73aaf7d497dd7d2946badf92d189d2333f163e66dced91feb446bc9bdee850",
+    "fox.glb": "ac1ae804da301371509cff84206e3c6b78ff9c7d02411ef0cd004731090d6b82",
+    "dog.glb": "c127d71ac8794f9710313bbb44800ae33a79f1182cf5c523c4233cc10a93851f",
+    "bunny.glb": "94b654915d9de70071bcf0bfa13de379a3ba4fdfeb231f0fec49335232cbc821",
+    "panda.glb": "e001aea4fcd1c2dcb384774019f84183e6d0b638ebd986da65fee32bd93d1359"
+  }
+}

@@ -76,3 +76,17 @@ class LucyTests(unittest.TestCase):
             with urllib.request.urlopen(self.server.url+name) as response:
                 self.assertEqual(response.status,200)
                 self.assertTrue(response.read(16))
+
+    def test_animal_assets_have_valid_hashes_and_local_textures(self):
+        import hashlib
+        from pathlib import Path
+        root=Path(__file__).resolve().parents[1]/'web/lucy/animals'
+        manifest=json.loads((root/'SOURCE.json').read_text())
+        for name,digest in manifest['files'].items():
+            with urllib.request.urlopen(self.server.url+'animals/'+name) as response:
+                data=response.read()
+                self.assertEqual(data[:4],b'glTF')
+                self.assertEqual(hashlib.sha256(data).hexdigest(),digest)
+        with urllib.request.urlopen(self.server.url+'animals/Textures/colormap.png') as response:
+            self.assertEqual(response.headers.get_content_type(),'image/png')
+            self.assertEqual(response.read(8),b'\x89PNG\r\n\x1a\n')
