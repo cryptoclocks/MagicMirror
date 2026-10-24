@@ -16,3 +16,5 @@ test('framing follows the visible body, waits for stable changes, and holds on l
  assert.equal(framing.update(points,2500),'full');
  assert.equal(framing.update(points,3000),'half');
 });
+
+test('manual framing stays selected while automatic tracking keeps updating',()=>{const framing=new AvatarFraming();framing.setMode('full');assert.equal(framing.current,'full');framing.update(null,500);assert.equal(framing.current,'full');framing.setMode('half');assert.equal(framing.current,'half');framing.setMode('auto');assert.equal(framing.current,'half');const points=pose();framing.update(points,700);framing.update(points,1300);assert.equal(framing.current,'full');framing.setMode('invalid');assert.equal(framing.selection,'auto');});

@@ -6,7 +6,7 @@ const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const defaults={11:[-.22,.52,0],12:[.22,.52,0],13:[-.35,.23,0],14:[.35,.23,0],15:[-.40,-.02,0],16:[.40,-.02,0],23:[-.13,0,0],24:[.13,0,0],25:[-.14,-.42,0],26:[.14,-.42,0],27:[-.15,-.82,0],28:[.15,-.82,0]};
 export class CartoonAvatar {
   constructor(video){
-    this.faceScale=1;this.video=video;this.framing=new AvatarFraming();this.animals=new Map();this.character='human';this.disposed=false;
+    this.faceScale=1;this.hatScale=1;this.video=video;this.framing=new AvatarFraming();this.animals=new Map();this.character='human';this.disposed=false;
     this.renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});
     this.renderer.setPixelRatio(1);this.renderer.setClearColor(0,0);
     this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(33,16/9,.1,20);this.camera.position.set(0,.15,4.1);this.camera.lookAt(0,.15,0);
@@ -30,8 +30,9 @@ export class CartoonAvatar {
     for(const x of [-.105,.105]){const eye=ball(.067,this.white,this.head);eye.scale.set(.85,1,.38);eye.position.set(x,.035,.245);const pupil=ball(.030,this.black,eye);pupil.scale.set(1,1,.5);pupil.position.z=.055;this.eyes.push(eye);const brow=new THREE.Mesh(new THREE.CapsuleGeometry(.014,.07,3,8),this.hairMaterial);brow.rotation.z=Math.PI/2;brow.position.set(x,.13,.25);this.head.add(brow);}
     this.mouth=ball(.065,this.black,this.head);this.mouth.position.set(0,-.13,.245);this.mouth.scale.set(1,.2,.25);
     this.hats=new THREE.Group();this.head.add(this.hats);
-    this.cap=new THREE.Group();this.hats.add(this.cap);const cap=ball(.29,this.cloth,this.cap);cap.scale.set(1,.48,1);cap.position.y=.25;const brim=new THREE.Mesh(new THREE.CylinderGeometry(.24,.24,.025,24),this.cloth);brim.scale.set(1,1,.75);brim.position.set(0,.21,.18);this.cap.add(brim);
-    this.crown=new THREE.Group();this.hats.add(this.crown);const gold=new THREE.MeshToonMaterial({color:'#eebd4d'});const band=new THREE.Mesh(new THREE.CylinderGeometry(.22,.23,.12,16,true),gold);band.position.y=.30;this.crown.add(band);for(let i=0;i<5;i++){const tooth=new THREE.Mesh(new THREE.ConeGeometry(.065,.18,4),gold);const a=i*Math.PI*2/5;tooth.position.set(Math.sin(a)*.205,.43,Math.cos(a)*.205);this.crown.add(tooth);}
+    this.hatMaterial=new THREE.MeshToonMaterial({color:'#248b87'});
+    this.cap=new THREE.Group();this.hats.add(this.cap);const cap=ball(.29,this.hatMaterial,this.cap);cap.scale.set(1,.48,1);cap.position.y=.25;const brim=new THREE.Mesh(new THREE.CylinderGeometry(.24,.24,.025,24),this.hatMaterial);brim.scale.set(1,1,.75);brim.position.set(0,.21,.18);this.cap.add(brim);
+    this.crown=new THREE.Group();this.hats.add(this.crown);const gold=this.hatMaterial;const band=new THREE.Mesh(new THREE.CylinderGeometry(.22,.23,.12,16,true),gold);band.position.y=.30;this.crown.add(band);for(let i=0;i<5;i++){const tooth=new THREE.Mesh(new THREE.ConeGeometry(.065,.18,4),gold);const a=i*Math.PI*2/5;tooth.position.set(Math.sin(a)*.205,.43,Math.cos(a)*.205);this.crown.add(tooth);}
     this.hats.traverse(node=>node.layers.set(1));
     this.scene.traverse(node=>{if(node.isLight)node.layers.enable(1);});
     this.faceCanvas=document.createElement('canvas');this.faceCanvas.width=this.faceCanvas.height=512;
@@ -44,7 +45,10 @@ export class CartoonAvatar {
   }
   setHat(value){this.cap.visible=value==='cap';this.crown.visible=value==='crown';}
   setOutfit(color){this.cloth.color.set(color);}
-  setFaceScale(value){this.faceScale=Number.isFinite(value)?clamp(value,.6,1.5):1;this.realFace.scale.set(this.faceScale,this.faceScale,1);this.hats.scale.setScalar(this.faceScale);}
+  setFaceScale(value){this.faceScale=Number.isFinite(value)?clamp(value,.6,1.5):1;this.realFace.scale.set(this.faceScale,this.faceScale,1);}
+  setHatScale(value){this.hatScale=Number.isFinite(value)?clamp(value,.6,1.6):1;this.hats.scale.setScalar(this.hatScale);}
+  setHatColor(color){this.hatMaterial.color.set(color);}
+  setFraming(value){this.framing.setMode(value);}
   setOwnFace(value){this.ownFace=!!value;if(!value)this.realFace.visible=false;this.refreshHead();}
   refreshHead(){
     const animal=!['human','robot'].includes(this.character),real=this.realFace.visible;
@@ -76,7 +80,7 @@ export class CartoonAvatar {
     const contour=faceOval.map(i=>face[i]),xs=contour.map(p=>p.x),ys=contour.map(p=>p.y),cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2;
     const width=Math.max(.03,Math.max(...xs)-Math.min(...xs)),height=Math.max(.03,Math.max(...ys)-Math.min(...ys));
     const vertices=[{x:cx,y:cy},...contour],positions=this.faceGeometry.attributes.position,uv=this.faceGeometry.attributes.uv;
-    vertices.forEach((p,i)=>{const x=(cx-p.x)/width*.51,y=(cy-p.y)/height*.57;positions.setXYZ(i,x,y,(['human','robot'].includes(this.character)?.295:.38)+Math.max(0,1-(x/.27)**2-(y/.30)**2)*.035);uv.setXY(i,p.x,1-p.y);});
+    vertices.forEach((p,i)=>{const x=(cx-p.x)/width*.51,y=(cy-p.y)/height*.57;positions.setXYZ(i,x,y,(['human','robot'].includes(this.character)?.255:.33)+Math.max(0,1-(x/.27)**2-(y/.30)**2)*.035);uv.setXY(i,p.x,1-p.y);});
     positions.needsUpdate=uv.needsUpdate=true;
   }
   update(data,now){
@@ -99,7 +103,7 @@ export class CartoonAvatar {
     if(now-this.lastTracking>500){this.targetRotation.set(0,0,0);this.expression={jaw:0,left:0,right:0,smile:0};}
     this.rotation.lerp(this.targetRotation,alpha);this.head.rotation.set(this.rotation.x,this.rotation.y,this.rotation.z);
     this.eyes[0].scale.y=Math.max(.10,1-this.expression.left*.95);this.eyes[1].scale.y=Math.max(.10,1-this.expression.right*.95);this.mouth.scale.y=.13+this.expression.jaw*1.4;this.mouth.scale.x=1+this.expression.smile*.5;
-    const half=this.framing.mode==='half',extra=Math.max(0,this.faceScale-1),targetY=half?.56:.15+extra*.12,targetZ=(half?2.9:4.1)+extra*1.5;
+    const half=this.framing.current==='half',extra=Math.max(0,this.faceScale-1,this.hatScale-1),targetY=half?.56:.15+extra*.12,targetZ=(half?2.9:4.1)+extra*1.5;
     const frameAlpha=1-Math.exp(-dt/.24);this.camera.position.y+=(targetY-this.camera.position.y)*frameAlpha;this.camera.position.z+=(targetZ-this.camera.position.z)*frameAlpha;this.camera.lookAt(0,this.camera.position.y,0);
     this.updateFaceTexture(now);
     this.renderer.render(this.scene,this.camera);

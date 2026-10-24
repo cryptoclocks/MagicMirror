@@ -12,6 +12,7 @@ const prompts = {
 };
 let run = 0, busy = false, active = false, previewStream = null, deadline = 0, watch = null, lastFrame = 0;
 let abort = null, frameCallback = null;
+let avatarView='auto';
 let renderer = null, tracking = null, customBackground = null, style = 'anime';
 const isTracked = () => ['background','avatar'].includes($('provider').value);
 const isLocal = () => $('provider').value === 'local';
@@ -141,6 +142,7 @@ async function startTracking() {
         if($('provider').value==='avatar')status(metrics.face?'AVATAR LIVE · ในเครื่อง':'AVATAR · หันหน้าเข้ากล้องเพื่อขยับสีหน้า');}},
       onError:()=>{if(thisRun===run)stop('ตัวติดตามไม่พร้อม กรุณาหยุดแล้วลองใหม่');}});
     tracking.setBackground($('live-background').value,customBackground);
+    tracking.avatar?.setFraming(avatarView);tracking.avatar?.setHatScale(Number($('avatar-hat-scale').value)/100);tracking.avatar?.setHatColor($('avatar-hat-color').value);
     tracking.avatar?.setFaceScale(Number($('avatar-face-scale').value)/100);tracking.avatar?.setOwnFace($('avatar-own-face').checked);tracking.avatar?.setHat($('avatar-hat').value);tracking.avatar?.setOutfit($('avatar-outfit').value);tracking.avatar?.setCharacter($('avatar-character').value);
     await tracking.start();if(thisRun!==run)return;
     $('local-output').hidden=false;$('empty').style.display='none';busy=false;active=true;controls();status('LIVE · ประมวลผลในเครื่อง');
@@ -248,3 +250,7 @@ if(typeof QWebChannel!=='undefined'&&window.qt?.webChannelTransport)new QWebChan
 $('avatar-face-scale').oninput=()=>{const value=Number($('avatar-face-scale').value);$('avatar-face-scale-value').textContent=value+'%';tracking?.avatar?.setFaceScale(value/100);};
 $('studio-back').onclick=()=>window.auraMenu?.goBack();
 $('cloud-key').onclick=()=>window.auraMenu?.configureKey();
+
+$('avatar-hat-scale').oninput=()=>{const value=Number($('avatar-hat-scale').value);$('avatar-hat-scale-value').textContent=value+'%';tracking?.avatar?.setHatScale(value/100);};
+$('avatar-hat-color').oninput=()=>tracking?.avatar?.setHatColor($('avatar-hat-color').value);
+document.querySelectorAll('[data-avatar-view]').forEach(button=>button.onclick=()=>{avatarView=button.dataset.avatarView;document.querySelectorAll('[data-avatar-view]').forEach(item=>{const selected=item===button;item.classList.toggle('active',selected);item.setAttribute('aria-pressed',String(selected));});tracking?.avatar?.setFraming(avatarView);});

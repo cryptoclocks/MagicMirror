@@ -1,6 +1,8 @@
 // Require several consistent observations; missing landmarks never change framing.
 export class AvatarFraming {
-  constructor(){this.mode='half';this.candidate=null;this.since=0;}
+  constructor(){this.selection='auto';this.mode='half';this.candidate=null;this.since=0;}
+  setMode(value){this.selection=['auto','full','half'].includes(value)?value:'auto';}
+  get current(){return this.selection==='auto'?this.mode:this.selection;}
   update(points,now){
     const visible=i=>points?.[i]&&points[i].visibility>.6&&points[i].y>.01&&points[i].y<.97;
     if(!visible(11)||!visible(12))return this.mode;
