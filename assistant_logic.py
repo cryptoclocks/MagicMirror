@@ -6,6 +6,13 @@ from hat_catalog import HATS, parse_hat_choice
 from daily_tasks import DailyTasks
 
 COMMANDS = {
+    'studio': {
+        'phrase':'เปิดเอไอสตูดิโอ',
+        'aliases':('เปิดเอไอสตูดิโอ','เปิด AI Studio','เปิดลูซี่','เปิด Lucy','เปลี่ยนสไตล์กระจก','เปิดสตูดิโอ'),
+        'state':'studio',
+        'replies':('เปิดเอไอสตูดิโอให้แล้วค่ะ เลือกสไตล์แล้วกดเริ่มได้เลยค่ะ',
+                   'พร้อมสร้างสรรค์แล้วค่ะ เลือกเอฟเฟกต์ที่ชอบได้เลยค่ะ'),
+    },
     'enter': {
         'phrase': 'เข้าหน้าหลัก',
         'aliases': ('เข้าหน้าหลัก', 'เปิดหน้าหลัก', 'เริ่มต้นระบบ'),
@@ -106,6 +113,8 @@ def classify_command(text):
     actions = ('ตรวจ','ดู','เปิด','ขอ','แสดง','สแกน','วัด','เริ่ม','สรุป','เช็ค','เช็ก','รายงาน','เข้า','ไป','กลับ')
     has_action = any(word in value for word in actions)
     candidates = set()
+    if any(word in value for word in ('เอไอสตูดิโอ','เปิดสตูดิโอ','aistudio','ลูซี่','ลูซี','lucy','เปลี่ยนสไตล์กระจก')) and (has_action or value in ('ลูซี่','ลูซี','lucy','aistudio','เอไอสตูดิโอ')):
+        candidates.add('studio')
     if any(word in value for word in ('สิ่งที่ต้องทำ','ต้องทำวันนี้','วันนี้ต้องทำอะไร','งานวันนี้','ตารางวันนี้')):
         candidates.add('tasks')
     if ('หมวก' in value or 'มงกุฎ' in value) and (any(word in value for word in ('ถอด','ปิด','เลิกใส่')) or ('เอา' in value and 'ออก' in value)):

@@ -15,3 +15,5 @@ __pycache__/
 .pytest_cache/
 # Installer downloads and verifies this model on first run
 assets/models/lbfmodel.yaml
+
+node_modules/

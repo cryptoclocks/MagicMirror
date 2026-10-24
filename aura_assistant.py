@@ -37,6 +37,7 @@ class AssistantMirror(Mirror):
         super().__init__(camera=camera, demo=True, fullscreen=False)
         self.demo = demo
         self.engine = CommandEngine()
+        self.studio = None
         self.tasks = DailyTasks()
         self.hat_renderer = HatRenderer()
         self.hat_enabled = False
@@ -95,6 +96,8 @@ class AssistantMirror(Mirror):
         self.send_button.clicked.connect(self.submit_text)
         self.camera_button = QPushButton('กล้อง / เว็บแคม ▾',self)
         self.camera_button.clicked.connect(self.show_camera_menu)
+        self.studio_button = QPushButton('AI Studio · L',self)
+        self.studio_button.clicked.connect(lambda: self.execute('เปิดเอไอสตูดิโอ'))
         self.camera_menu = QMenu(self)
         self.media_devices = QMediaDevices(self)
         self.selected_camera_id = None
@@ -131,7 +134,9 @@ class AssistantMirror(Mirror):
         s=min(self.width()/1440,self.height()/900)
         dx=(self.width()-1440*s)/2
         dy=(self.height()-900*s)/2
-        for widget,x,y,w,h in ((self.mic_button,46,839,185,42),
+        if getattr(self,'studio',None):
+            self.studio.setGeometry(0,0,self.width(),max(100,round(dy+760*s)))
+        for widget,x,y,w,h in ((self.studio_button,1215,16,180,38),(self.mic_button,46,839,185,42),
                                 (self.camera_button,245,839,260,42),
                                 (self.input,519,839,756,42),(self.send_button,1288,839,106,42)):
             widget.setGeometry(round(dx+x*s),round(dy+y*s),round(w*s),round(h*s))
@@ -347,9 +352,12 @@ class AssistantMirror(Mirror):
 
     def execute(self,text,speak=True):
         self.heard_text=text
+        old_mode=self.mode
         action,reply=self.engine.handle(text)
         self.response=reply
         if action:
+            if old_mode=='studio' and self.mode!='studio':
+                self.close_studio()
             if action in ('health','health_report'):
                 self.hat_picker = False
             if action == 'hats':
@@ -379,6 +387,8 @@ class AssistantMirror(Mirror):
                 self.box=None
                 self.landmarks=None
                 self.target=None
+            if action=='studio':
+                self.open_studio()
             if action=='sales':
                 self.period_changed=time.monotonic()
             if self.mode=='dark':
@@ -387,6 +397,28 @@ class AssistantMirror(Mirror):
             self.speak(reply)
         self.update()
         return action
+
+    def open_studio(self):
+        if self.studio is not None:
+            return
+        try:
+            from lucy_studio import create_studio
+            self.studio=create_studio(self,lambda: self.execute('กลับหน้าหลัก'))
+            self.layout_controls()
+            self.studio.show()
+            self.studio.raise_()
+        except (ImportError,RuntimeError) as exc:
+            self.notice='เปิด AI Studio ไม่สำเร็จ ตรวจการติดตั้ง PySide6 WebEngine'
+            self.notice_until=time.monotonic()+12
+            self.engine.state='home'
+            if not self.demo:
+                self.start_camera()
+
+    def close_studio(self):
+        if self.studio is not None:
+            studio=self.studio
+            self.studio=None
+            studio.shutdown()
 
     def speak(self,text):
         self.stop_speech()
@@ -475,6 +507,8 @@ class AssistantMirror(Mirror):
                 self.start_camera()
         elif key in (Qt.Key.Key_1,Qt.Key.Key_2,Qt.Key.Key_3) and self.mode=='sales':
             self.set_period(('daily','monthly','yearly')[key-Qt.Key.Key_1])
+        elif key==Qt.Key.Key_L:
+            self.execute('เปิดเอไอสตูดิโอ')
         elif key==Qt.Key.Key_B:
             self.execute('เลือกหมวก')
         elif self.hat_picker and self.mode in ('home','health') and Qt.Key.Key_1<=key<=Qt.Key.Key_5:
@@ -546,6 +580,7 @@ class AssistantMirror(Mirror):
 
     def closeEvent(self,event):
         self.closing=True
+        self.close_studio()
         self.mic_latched=False
         self.m_hold_timer.stop()
         self.mic_resume_timer.stop()
@@ -871,6 +906,7 @@ class AssistantMirror(Mirror):
         # During QWidget construction resize/paint can occur before shell fields exist.
         if not hasattr(self,'engine'):
             return
+        self.studio_button.setVisible(self.mode not in ('dark','studio'))
         dark=self.mode=='dark'
         visible=not dark or time.monotonic()<self.dark_controls_until or self.voice_status in ('listening','thinking','starting')
         for widget in (self.mic_button,self.camera_button,self.input,self.send_button):
