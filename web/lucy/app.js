@@ -98,6 +98,7 @@ const session = new StudioSession({
 });
 const generative = createGenerative({capture,status,changed:value=>{busy=false;active=value;controls();}});
 window.refreshConfig = async () => {
+  if(isTracked()){$('hint').textContent=$('provider').value==='avatar'?'ติดตามหน้าและท่าทาง · เลือกตามกล้อง เต็มตัว หรือครึ่งตัวได้':'แยกคนจากฉากหลังในเครื่อง · เลือกฉากหรือรูปของคุณได้';controls();return;}
   try {
     const config = await (await fetch('config')).json();
     $('start').dataset.hasKey = config.hasKey ? 'yes' : '';
@@ -160,6 +161,7 @@ $('live-upload').onchange=async()=>{
   try{const image=await createImageBitmap(file);customBackground?.close?.();customBackground=image;$('live-background').value='custom';tracking?.setBackground('custom',image);}catch{status('เปิดรูปพื้นหลังไม่ได้');}
 };
 $('provider').onchange = () => {
+  if(!isTracked())$('provider').value='background';
   stop();
   const generating = $('provider').value==='generative';
   $('presets').hidden = generating || isTracked(); $('prompt-form').hidden = generating || isTracked();
@@ -173,27 +175,9 @@ $('provider').onchange = () => {
   $('prompt').value = isLocal() ? document.querySelector('[data-style].active').textContent : prompts[style];
   void window.refreshConfig();
 };
-$('start').onclick = async () => {
-  if (isTracked()) return startTracking();
-  if ($('provider').value==='generative') { stop();busy=true;controls();try {await generative.start();} catch(error) {stop(errorText(error));} return; }
-  if (isLocal()) return startLocal();
-  if (!$('prompt').value.trim()) return status('เลือกสไตล์หรือพิมพ์เอฟเฟกต์ก่อน');
-  stop(); busy = true; controls(); status('กำลังเปิดกล้องและเชื่อมต่อ…');
-  const thisRun = run;
-  // Stop also invalidates a late-resolving connection, preventing orphan sessions.
-  const setupTimeout = setTimeout(() => stop('เชื่อมต่อนานเกินไป · หยุดส่งภาพแล้ว'),35000);
-  try {
-    const connected = await session.start();
-    if (!connected || thisRun !== run) return;
-    busy = false; active = true; deadline = Date.now()+120000; lastFrame = Date.now(); controls(); status('AI LIVE · LUCY 2.5');
-    watch = setInterval(() => {
-      const left = Math.max(0,Math.ceil((deadline-Date.now())/1000));
-      $('timer').textContent = `${left}s`;
-      if (!left) stop('ครบ 2 นาที · หยุดแล้ว กดเริ่มเพื่อใช้อีกครั้ง');
-      else if ($('output').requestVideoFrameCallback && Date.now()-lastFrame > 20000) stop('ไม่ได้รับภาพใหม่ · หยุดส่งภาพแล้ว');
-    },1000);
-  } catch(error) { if (thisRun === run) stop(errorText(error)); }
-  finally { clearTimeout(setupTimeout); }
+$('start').onclick = () => {
+  if(!isTracked())return status('เลือกอวาตาร์หรือเปลี่ยนพื้นหลังก่อน');
+  return startTracking();
 };
 $('preview').onclick = async () => {
   stop(); busy = true; controls(); const thisRun = run;
@@ -249,7 +233,7 @@ if(typeof QWebChannel!=='undefined'&&window.qt?.webChannelTransport)new QWebChan
 
 $('avatar-face-scale').oninput=()=>{const value=Number($('avatar-face-scale').value);$('avatar-face-scale-value').textContent=value+'%';tracking?.avatar?.setFaceScale(value/100);};
 $('studio-back').onclick=()=>window.auraMenu?.goBack();
-$('cloud-key').onclick=()=>window.auraMenu?.configureKey();
+
 
 $('avatar-hat-scale').oninput=()=>{const value=Number($('avatar-hat-scale').value);$('avatar-hat-scale-value').textContent=value+'%';tracking?.avatar?.setHatScale(value/100);};
 $('avatar-hat-color').oninput=()=>tracking?.avatar?.setHatColor($('avatar-hat-color').value);

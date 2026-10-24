@@ -90,3 +90,11 @@ class LucyTests(unittest.TestCase):
         with urllib.request.urlopen(self.server.url+'animals/Textures/colormap.png') as response:
             self.assertEqual(response.headers.get_content_type(),'image/png')
             self.assertEqual(response.read(8),b'\x89PNG\r\n\x1a\n')
+
+    def test_studio_offers_only_avatar_and_background(self):
+        import re
+        with urllib.request.urlopen(self.server.url) as response:
+            html=response.read().decode()
+        provider=re.search(r'<select id="provider"[^>]*>(.*?)</select>',html).group(1)
+        self.assertEqual(re.findall(r'<option value="([^"]+)"',provider),['background','avatar'])
+        self.assertNotIn('id="cloud-key"',html)
