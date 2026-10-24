@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {buildFaceSurface} from './face-surface.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {AvatarFraming} from './avatar-framing.js';
 const faceOval=[10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109];
@@ -37,15 +38,15 @@ export class CartoonAvatar {
     this.scene.traverse(node=>{if(node.isLight)node.layers.enable(1);});
     this.faceCanvas=document.createElement('canvas');this.faceCanvas.width=this.faceCanvas.height=512;
     this.faceTexture=new THREE.CanvasTexture(this.faceCanvas);this.faceTexture.colorSpace=THREE.SRGBColorSpace;
-    this.faceGeometry=new THREE.BufferGeometry();this.faceGeometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array((faceOval.length+1)*3),3));this.faceGeometry.setAttribute('uv',new THREE.BufferAttribute(new Float32Array((faceOval.length+1)*2),2));
-    const indices=[];for(let i=0;i<faceOval.length;i++)indices.push(0,i+1,(i+1)%faceOval.length+1);this.faceGeometry.setIndex(indices);
-    this.realFace=new THREE.Mesh(this.faceGeometry,new THREE.MeshBasicMaterial({map:this.faceTexture,side:THREE.DoubleSide,transparent:true}));this.realFace.visible=false;this.realFace.frustumCulled=false;this.head.add(this.realFace);
+    this.faceGeometry=new THREE.BufferGeometry();
+    // A decal uses the head's own triangles, so the image cannot float off its surface.
+    this.realFace=new THREE.Mesh(this.faceGeometry,new THREE.MeshBasicMaterial({map:this.faceTexture,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));this.realFace.renderOrder=2;this.realFace.visible=false;this.realFace.frustumCulled=false;this.head.add(this.realFace);
     this.cartoonFeatures=this.head.children.filter(n=>n!==this.hats&&n!==this.skull&&n!==this.hair&&n!==this.realFace);
     this.robot=false;this.setHat('none');this.rotation=new THREE.Vector3();this.targetRotation=new THREE.Vector3();this.expression={jaw:0,left:0,right:0,smile:0};this.last=0;this.lastTracking=-10000;this.lastPoseTracking=-10000;
   }
   setHat(value){this.cap.visible=value==='cap';this.crown.visible=value==='crown';}
   setOutfit(color){this.cloth.color.set(color);}
-  setFaceScale(value){this.faceScale=Number.isFinite(value)?clamp(value,.6,1.5):1;this.realFace.scale.set(this.faceScale,this.faceScale,1);}
+  setFaceScale(value){this.faceScale=Number.isFinite(value)?clamp(value,.6,1.5):1;}
   setHatScale(value){this.hatScale=Number.isFinite(value)?clamp(value,.6,1.6):1;this.hats.scale.setScalar(this.hatScale);}
   setHatColor(color){this.hatMaterial.color.set(color);}
   setFraming(value){this.framing.setMode(value);}
@@ -76,13 +77,27 @@ export class CartoonAvatar {
     const face=this.faceLandmarks;
     this.realFace.visible=!!(this.ownFace&&face&&now-this.lastTracking<350&&this.video?.readyState>=2);
     this.refreshHead();if(!this.realFace.visible)return;
-    const ctx=this.faceCanvas.getContext('2d');ctx.drawImage(this.video,0,0,512,512);this.faceTexture.needsUpdate=true;
-    const contour=faceOval.map(i=>face[i]),xs=contour.map(p=>p.x),ys=contour.map(p=>p.y),cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2;
-    const width=Math.max(.03,Math.max(...xs)-Math.min(...xs)),height=Math.max(.03,Math.max(...ys)-Math.min(...ys));
-    const vertices=[{x:cx,y:cy},...contour],positions=this.faceGeometry.attributes.position,uv=this.faceGeometry.attributes.uv;
-    vertices.forEach((p,i)=>{const x=(cx-p.x)/width*.51,y=(cy-p.y)/height*.57;positions.setXYZ(i,x,y,(['human','robot'].includes(this.character)?.255:.33)+Math.max(0,1-(x/.27)**2-(y/.30)**2)*.035);uv.setXY(i,p.x,1-p.y);});
-    positions.needsUpdate=uv.needsUpdate=true;
+    const contour=faceOval.map(i=>face[i]),xs=contour.map(p=>p.x),ys=contour.map(p=>p.y);
+    const left=Math.min(...xs),top=Math.min(...ys),width=Math.max(.03,Math.max(...xs)-left),height=Math.max(.03,Math.max(...ys)-top);
+    const ctx=this.faceCanvas.getContext('2d'),vw=this.video.videoWidth||this.video.width,vh=this.video.videoHeight||this.video.height;
+    ctx.clearRect(0,0,512,512);ctx.save();ctx.translate(512,0);ctx.scale(-1,1);ctx.beginPath();
+    contour.forEach((p,i)=>{const x=(p.x-left)/width*512,y=(p.y-top)/height*512;if(i)ctx.lineTo(x,y);else ctx.moveTo(x,y);});
+    ctx.closePath();ctx.clip();ctx.drawImage(this.video,left*vw,top*vh,width*vw,height*vh,0,0,512,512);ctx.restore();this.faceTexture.needsUpdate=true;
+    this.fitFaceSurface();
   }
+  fitFaceSurface(){
+    const animal=!['human','robot'].includes(this.character),group=animal?this.animals.get(this.character):null;
+    if(animal&&!group){this.realFace.visible=false;return;}
+    const key=this.character+':'+this.faceScale+':'+(group?.uuid||'skull');
+    if(key===this.faceSurfaceKey)return;
+    this.head.updateWorldMatrix(true,true);
+    const meshes=[];
+    if(group)group.traverse(node=>{if(!node.isMesh)return;let parent=node;while(parent&&parent!==group){if(!parent.visible)return;parent=parent.parent;}meshes.push(node);});
+    else meshes.push(this.skull);
+    const geometry=buildFaceSurface(this.head,meshes,this.faceScale,animal);
+    this.faceGeometry.dispose();this.faceGeometry=geometry;this.realFace.geometry=geometry;this.faceSurfaceKey=key;this.faceSurfaceMeshes=meshes;
+  }
+
   update(data,now){
     this.framing.update(data.landmarks,now);
     if(data.world){this.lastPoseTracking=now;for(const [id,fallback] of Object.entries(defaults)){const p=data.world[id],visible=data.landmarks?.[id]?.visibility??0;if(p&&visible>.45)this.targets[id].set(clamp(-p.x,-1.2,1.2),clamp(-p.y,-1.2,1.2),clamp(-p.z,-.6,.6));else this.targets[id].set(...fallback);}}
