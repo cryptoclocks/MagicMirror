@@ -141,7 +141,7 @@ async function startTracking() {
         if($('provider').value==='avatar')status(metrics.face?'AVATAR LIVE · ในเครื่อง':'AVATAR · หันหน้าเข้ากล้องเพื่อขยับสีหน้า');}},
       onError:()=>{if(thisRun===run)stop('ตัวติดตามไม่พร้อม กรุณาหยุดแล้วลองใหม่');}});
     tracking.setBackground($('live-background').value,customBackground);
-    tracking.avatar?.setOwnFace($('avatar-own-face').checked);tracking.avatar?.setHat($('avatar-hat').value);tracking.avatar?.setOutfit($('avatar-outfit').value);tracking.avatar?.setCharacter($('avatar-character').value);
+    tracking.avatar?.setFaceScale(Number($('avatar-face-scale').value)/100);tracking.avatar?.setOwnFace($('avatar-own-face').checked);tracking.avatar?.setHat($('avatar-hat').value);tracking.avatar?.setOutfit($('avatar-outfit').value);tracking.avatar?.setCharacter($('avatar-character').value);
     await tracking.start();if(thisRun!==run)return;
     $('local-output').hidden=false;$('empty').style.display='none';busy=false;active=true;controls();status('LIVE · ประมวลผลในเครื่อง');
     void cameras().catch(()=>{});
@@ -238,9 +238,13 @@ void cameras().catch(() => {});
 $('provider').onchange();
 
 $('avatar-own-face').onchange=()=>tracking?.avatar?.setOwnFace($('avatar-own-face').checked);
-window.setMenuHidden=hidden=>{document.body.classList.toggle('immersive',hidden);$('menu-toggle').textContent=hidden?'แสดงเมนู · F2':'ซ่อนเมนู · F2';};
+window.setMenuHidden=hidden=>{document.body.classList.toggle('immersive',hidden);$('menu-toggle').textContent=hidden?'เปิดเมนูขึ้น · F2':'พับเมนูลง · F2';$('menu-toggle').setAttribute('aria-expanded',String(!hidden));};
 function toggleMenu(){const hidden=!document.body.classList.contains('immersive');window.setMenuHidden(hidden);window.auraMenu?.setMenuHidden(hidden);}
 $('menu-toggle').onclick=toggleMenu;
 window.addEventListener('keydown',event=>{if(event.key==='F2'){event.preventDefault();toggleMenu();}});
 
 if(typeof QWebChannel!=='undefined'&&window.qt?.webChannelTransport)new QWebChannel(qt.webChannelTransport,channel=>{window.auraMenu=channel.objects.auraMenu;});
+
+$('avatar-face-scale').oninput=()=>{const value=Number($('avatar-face-scale').value);$('avatar-face-scale-value').textContent=value+'%';tracking?.avatar?.setFaceScale(value/100);};
+$('studio-back').onclick=()=>window.auraMenu?.goBack();
+$('cloud-key').onclick=()=>window.auraMenu?.configureKey();

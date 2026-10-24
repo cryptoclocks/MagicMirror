@@ -6,7 +6,7 @@ const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const defaults={11:[-.22,.52,0],12:[.22,.52,0],13:[-.35,.23,0],14:[.35,.23,0],15:[-.40,-.02,0],16:[.40,-.02,0],23:[-.13,0,0],24:[.13,0,0],25:[-.14,-.42,0],26:[.14,-.42,0],27:[-.15,-.82,0],28:[.15,-.82,0]};
 export class CartoonAvatar {
   constructor(video){
-    this.video=video;this.framing=new AvatarFraming();this.animals=new Map();this.character='human';this.disposed=false;
+    this.faceScale=1;this.video=video;this.framing=new AvatarFraming();this.animals=new Map();this.character='human';this.disposed=false;
     this.renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});
     this.renderer.setPixelRatio(1);this.renderer.setClearColor(0,0);
     this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(33,16/9,.1,20);this.camera.position.set(0,.15,4.1);this.camera.lookAt(0,.15,0);
@@ -32,6 +32,8 @@ export class CartoonAvatar {
     this.hats=new THREE.Group();this.head.add(this.hats);
     this.cap=new THREE.Group();this.hats.add(this.cap);const cap=ball(.29,this.cloth,this.cap);cap.scale.set(1,.48,1);cap.position.y=.25;const brim=new THREE.Mesh(new THREE.CylinderGeometry(.24,.24,.025,24),this.cloth);brim.scale.set(1,1,.75);brim.position.set(0,.21,.18);this.cap.add(brim);
     this.crown=new THREE.Group();this.hats.add(this.crown);const gold=new THREE.MeshToonMaterial({color:'#eebd4d'});const band=new THREE.Mesh(new THREE.CylinderGeometry(.22,.23,.12,16,true),gold);band.position.y=.30;this.crown.add(band);for(let i=0;i<5;i++){const tooth=new THREE.Mesh(new THREE.ConeGeometry(.065,.18,4),gold);const a=i*Math.PI*2/5;tooth.position.set(Math.sin(a)*.205,.43,Math.cos(a)*.205);this.crown.add(tooth);}
+    this.hats.traverse(node=>node.layers.set(1));
+    this.scene.traverse(node=>{if(node.isLight)node.layers.enable(1);});
     this.faceCanvas=document.createElement('canvas');this.faceCanvas.width=this.faceCanvas.height=512;
     this.faceTexture=new THREE.CanvasTexture(this.faceCanvas);this.faceTexture.colorSpace=THREE.SRGBColorSpace;
     this.faceGeometry=new THREE.BufferGeometry();this.faceGeometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array((faceOval.length+1)*3),3));this.faceGeometry.setAttribute('uv',new THREE.BufferAttribute(new Float32Array((faceOval.length+1)*2),2));
@@ -42,6 +44,7 @@ export class CartoonAvatar {
   }
   setHat(value){this.cap.visible=value==='cap';this.crown.visible=value==='crown';}
   setOutfit(color){this.cloth.color.set(color);}
+  setFaceScale(value){this.faceScale=Number.isFinite(value)?clamp(value,.6,1.5):1;this.realFace.scale.set(this.faceScale,this.faceScale,1);this.hats.scale.setScalar(this.faceScale);}
   setOwnFace(value){this.ownFace=!!value;if(!value)this.realFace.visible=false;this.refreshHead();}
   refreshHead(){
     const animal=!['human','robot'].includes(this.character),real=this.realFace.visible;
@@ -96,10 +99,13 @@ export class CartoonAvatar {
     if(now-this.lastTracking>500){this.targetRotation.set(0,0,0);this.expression={jaw:0,left:0,right:0,smile:0};}
     this.rotation.lerp(this.targetRotation,alpha);this.head.rotation.set(this.rotation.x,this.rotation.y,this.rotation.z);
     this.eyes[0].scale.y=Math.max(.10,1-this.expression.left*.95);this.eyes[1].scale.y=Math.max(.10,1-this.expression.right*.95);this.mouth.scale.y=.13+this.expression.jaw*1.4;this.mouth.scale.x=1+this.expression.smile*.5;
-    const half=this.framing.mode==='half',targetY=half?.53:.15,targetZ=half?2.45:4.1;
+    const half=this.framing.mode==='half',extra=Math.max(0,this.faceScale-1),targetY=half?.56:.15+extra*.12,targetZ=(half?2.9:4.1)+extra*1.5;
     const frameAlpha=1-Math.exp(-dt/.24);this.camera.position.y+=(targetY-this.camera.position.y)*frameAlpha;this.camera.position.z+=(targetZ-this.camera.position.z)*frameAlpha;this.camera.lookAt(0,this.camera.position.y,0);
     this.updateFaceTexture(now);
-    this.renderer.render(this.scene,this.camera);return this.renderer.domElement;
+    this.renderer.render(this.scene,this.camera);
+    // Draw hats after the face/body, with their own depth buffer for correct hat geometry.
+    if(this.cap.visible||this.crown.visible){this.renderer.autoClear=false;this.renderer.clearDepth();this.camera.layers.set(1);this.renderer.render(this.scene,this.camera);this.camera.layers.set(0);this.renderer.autoClear=true;}
+    return this.renderer.domElement;
   }
   dispose(){this.disposed=true;this.faceTexture.dispose();const materials=new Set();this.scene.traverse(node=>{node.geometry?.dispose();if(node.material)materials.add(node.material);});for(const material of materials){material.map?.dispose();material.dispose();}this.renderer.dispose();this.renderer.forceContextLoss();}
 }

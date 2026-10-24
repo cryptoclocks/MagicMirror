@@ -63,7 +63,11 @@ export class TrackingMirror {
   }
   setBackground(scene,custom=null){this.scene=scene;this.custom=custom;this.backgroundDirty=true;}
   render(now){
-    const w=Math.min(960,this.video.videoWidth),h=Math.round(this.video.videoHeight*w/this.video.videoWidth);
+    let w=Math.min(960,this.video.videoWidth),h=Math.round(this.video.videoHeight*w/this.video.videoWidth);
+    if(this.mode==='avatar'&&this.canvas.clientWidth&&this.canvas.clientHeight){
+      h=Math.max(1,Math.round(w*this.canvas.clientHeight/this.canvas.clientWidth));
+      if(h>960){w=Math.max(1,Math.round(w*960/h));h=960;}
+    }
     if(this.canvas.width!==w||this.canvas.height!==h){this.canvas.width=this.person.width=this.backdrop.width=w;this.canvas.height=this.person.height=this.backdrop.height=h;this.backgroundDirty=true;}
     if(this.backgroundDirty){drawBackground(this.backdrop.getContext('2d'),w,h,this.scene,this.custom);this.backgroundDirty=false;}
     this.context.drawImage(this.backdrop,0,0);

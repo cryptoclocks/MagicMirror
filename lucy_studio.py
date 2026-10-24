@@ -167,7 +167,7 @@ def create_studio(parent, on_back):
     # Optional imports: a missing WebEngine must not prevent ordinary mirror startup.
     from PySide6.QtCore import QUrl, Qt, QObject, Slot
     from PySide6.QtWebChannel import QWebChannel
-    from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QInputDialog, QLineEdit, QApplication
+    from PySide6.QtWidgets import QWidget, QVBoxLayout, QInputDialog, QLineEdit, QApplication
     from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile
     from PySide6.QtWebEngineWidgets import QWebEngineView
 
@@ -183,6 +183,14 @@ def create_studio(parent, on_back):
         def setMenuHidden(self, hidden):
             self.parent().toggle_menu(hidden)
 
+        @Slot()
+        def goBack(self):
+            on_back()
+
+        @Slot()
+        def configureKey(self):
+            self.parent().configure_key()
+
     class Studio(QWidget):
         def __init__(self):
             super().__init__(parent)
@@ -191,17 +199,8 @@ def create_studio(parent, on_back):
             self.menu_hidden = False
             layout = QVBoxLayout(self)
             self.main_layout = layout
-            layout.setContentsMargins(14, 8, 14, 4)
-            self.toolbar = QWidget(self)
-            bar = QHBoxLayout(self.toolbar)
-            bar.addWidget(QLabel('AURA · STYLE STUDIO / LOCAL + LUCY'))
-            bar.addStretch()
-            key = QPushButton('ตั้ง API key · เฉพาะ Cloud')
-            key.clicked.connect(self.configure_key)
-            back = QPushButton('กลับหน้าหลัก')
-            back.clicked.connect(on_back)
-            bar.addWidget(key); bar.addWidget(back)
-            layout.addWidget(self.toolbar)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(0)
             self.view = QWebEngineView(self)
             self.profile = QWebEngineProfile(QApplication.instance())
             self.page = LocalPage(self.profile, self.view)
@@ -214,18 +213,11 @@ def create_studio(parent, on_back):
             self.page.featurePermissionRequested.connect(self.permission)
             self.view.setPage(self.page)
             self.view.setUrl(QUrl(self.server.url))
-            layout.addWidget(self.view)
+            layout.addWidget(self.view, 1)
             self.setStyleSheet('QLabel {color:#77fff1;} QWidget {background:#050e15;}')
 
         def toggle_menu(self, hidden):
             self.menu_hidden = hidden
-            self.toolbar.setVisible(not hidden)
-            self.main_layout.setContentsMargins(*( (0,0,0,0) if hidden else (14,8,14,4) ))
-            self.main_layout.setSpacing(0 if hidden else 6)
-            for name in ('mic_button','camera_button','input','send_button'):
-                widget = getattr(parent, name, None)
-                if widget is not None:
-                    widget.setVisible(not hidden)
             parent.layout_controls()
             parent.update()
 

@@ -135,7 +135,7 @@ class AssistantMirror(Mirror):
         dx=(self.width()-1440*s)/2
         dy=(self.height()-900*s)/2
         if getattr(self,'studio',None):
-            self.studio.setGeometry(0,0,self.width(),self.height() if self.studio.menu_hidden else max(100,round(dy+760*s)))
+            self.studio.setGeometry(0,0,self.width(),self.height())
         for widget,x,y,w,h in ((self.studio_button,1215,16,180,38),(self.mic_button,46,839,185,42),
                                 (self.camera_button,245,839,260,42),
                                 (self.input,519,839,756,42),(self.send_button,1288,839,106,42)):
@@ -407,6 +407,8 @@ class AssistantMirror(Mirror):
             self.layout_controls()
             self.studio.show()
             self.studio.raise_()
+            for widget in (self.studio_button,self.mic_button,self.camera_button,self.input,self.send_button):
+                widget.hide()
         except (ImportError,RuntimeError) as exc:
             self.notice='เปิด AI Studio ไม่สำเร็จ ตรวจการติดตั้ง PySide6 WebEngine'
             self.notice_until=time.monotonic()+12
@@ -910,7 +912,7 @@ class AssistantMirror(Mirror):
         dark=self.mode=='dark'
         visible=not dark or time.monotonic()<self.dark_controls_until or self.voice_status in ('listening','thinking','starting')
         for widget in (self.mic_button,self.camera_button,self.input,self.send_button):
-            widget.setVisible(visible and not (self.mode=='studio' and self.studio and self.studio.menu_hidden))
+            widget.setVisible(visible and not (self.mode=='studio'))
         if self.mode=='health':
             super().paintEvent(event)
         p=QPainter(self)
@@ -943,6 +945,6 @@ class AssistantMirror(Mirror):
                 self.today_page(p,t)
             if self.mode in ('home','health'):
                 self.draw_hat_layer(p,t)
-            if not (self.mode=='studio' and self.studio and self.studio.menu_hidden):
+            if not (self.mode=='studio'):
                 self.voice_footer(p,t)
         p.end()
